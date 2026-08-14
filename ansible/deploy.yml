@@ -26,3 +26,11 @@
           - "8000:8000"
         env:
           ENVIRONMENT: "{{ env }}"
+          KAFKA1: "localhost"
+          KAFKA2: "localhost"
+          KAFKA3: "localhost"
+          KAFKA_PORT: "9092"
+          ROCKSDB_SHARD1: "localhost"
+          ROCKSDB_SHARD2: "localhost"
+          ROCKSDB_SHARD3: "localhost"
+          ROCKSDB_BACKUP1: "localhost"
