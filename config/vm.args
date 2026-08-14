@@ -1,0 +1,10 @@
+-sname url_shortener
+
+-setcookie test
+
+-proto_dist inet_tcp
+ 
+-no_epmd true
+
++K true
++A30

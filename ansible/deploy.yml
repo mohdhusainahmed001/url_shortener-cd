@@ -1,0 +1,28 @@
+---
+- name: Deploy url_shortener container
+  hosts: all
+  become: true
+  vars:
+    container_name: url_shortener
+
+  tasks:
+    - name: Pull image from Nexus registry
+      community.docker.docker_image:
+        name: "{{ image_tag }}"
+        source: pull
+
+    - name: Stop existing container (if any)
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        state: absent
+
+    - name: Run new container
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        image: "{{ image_tag }}"
+        state: started
+        restart_policy: always
+        ports:
+          - "8000:8000"
+        env:
+          ENVIRONMENT: "{{ env }}"

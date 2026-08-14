@@ -1,0 +1,157 @@
+@Library('warcs-library') _
+
+pipeline {
+
+  agent { label 'erlang-agent' }
+  parameters {
+    choice(name: 'TARGET_ENV', choices: ['', 'uat', 'prod'], description: 'Force environment (optional)')
+    string(name: 'QA_BRANCH_PATTERN', defaultValue: 'release|beta', description: 'Regex for QA branches')
+    string(name: 'DEV_BRANCH_PATTERN', defaultValue: 'dev-devops|development', description: 'Regex for Development branches')
+  }
+  environment {
+    NEXUS_DOCKER_URL = '10.51.3.153:8081'
+    NEXUS_DOCKER_REPO = 'onex-docker'
+    IMAGE_NAME = 'url_shortner'
+    IMAGE_TAG = "${BUILD_NUMBER}"
+    FULL_IMAGE_BUILD = "${NEXUS_DOCKER_URL}/${NEXUS_DOCKER_REPO}/${IMAGE_NAME}/${env.BRANCH_NAME}:${IMAGE_TAG}"
+    FULL_IMAGE_LATEST = "${NEXUS_DOCKER_URL}/${NEXUS_DOCKER_REPO}/${IMAGE_NAME}/${env.BRANCH_NAME}:latest"
+  }
+
+
+  stages {
+
+  stage('Detect Trigger Type') {
+      steps {
+        script {
+          detectTriggerType()
+        }
+      }
+    }
+    stage('Checkout') {
+      steps {
+        branchCheckout()
+      }
+    }
+stage('Determine Environment') {
+      steps {
+        script {
+          env.VM = deriveUIEnvironment(env.BRANCH_NAME)
+          echo "Environment derived and set to: ${env.VM}"
+        }
+      }
+    }
+    stage('list files') {
+      steps {
+        sh 'ls -la'
+      }
+    }
+
+    stage('Build') {
+      steps {
+        // sh './build.sh'
+        // sh 'rebar3 release'
+        sh 'bash -i -c "rebar3 release"'
+      }
+    }
+    
+    stage('Tag & Push Image to Nexus') {
+       when {
+        not {
+            branch pattern: "PR-.*", comparator: "REGEXP"
+        }
+    }
+      steps {
+        script {
+          def repoPath = ""
+          def tagName = "url_shortner-${env.BRANCH_NAME}-${BUILD_NUMBER}"
+          def registryUrl = "10.51.3.153:8081"
+
+          if (params.TARGET_ENV in ['prod', 'uat']) {
+            repoPath = "onex-docker/url_shortner/${params.TARGET_ENV}"
+            echo "TARGET_ENV override active → Using repoPath: ${repoPath}"
+          } else{
+            repoPath = "onex-docker/url_shortner/${env.VM}"
+            echo "Using derived environment VM=${env.VM} → repoPath = ${repoPath}"
+          }
+          env.REPO_PATH = repoPath
+          env.TAG_NAME = tagName
+          env.REGISTRY_URL = registryUrl
+
+          echo """
+          ---- Docker Config ----
+          Branch       : ${env.BRANCH_NAME}
+          Repo Path    : ${env.REPO_PATH}
+          Tag Name     : ${env.TAG_NAME}
+          Registry URL : ${env.REGISTRY_URL}
+          ------------------------
+          """
+        }
+      }
+    }
+    stage('Generate url_shortner Image') {
+            when {
+        expression {
+          return !(env.BRANCH_NAME?.startsWith("PR") ||
+                   (env.BRANCH_NAME ==~ /^(main)$/ && env.TRIGGER_TYPE != 'MANUAL'))
+        }
+      }
+      steps {
+          sh """
+            docker build -t ${env.REGISTRY_URL}/${env.REPO_PATH}:${BUILD_NUMBER} .
+            docker tag ${env.REGISTRY_URL}/${env.REPO_PATH}:${BUILD_NUMBER} ${env.REGISTRY_URL}/${env.REPO_PATH}:${env.TAG_NAME}
+            docker tag ${env.REGISTRY_URL}/${env.REPO_PATH}:${BUILD_NUMBER} ${env.REGISTRY_URL}/${env.REPO_PATH}:latest
+
+          """
+      }
+    }
+    stage('Push Images to Nexus') {
+      when {
+        expression {
+          return !(env.BRANCH_NAME?.startsWith("PR") ||
+                   (env.BRANCH_NAME ==~ /^(main)$/ && env.TRIGGER_TYPE != 'MANUAL'))
+        }
+      }
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'nexus-cred', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+          script {
+            sh """
+              echo "$NEXUS_PASS" | docker login ${env.REGISTRY_URL} -u "$NEXUS_USER" --password-stdin
+              docker push ${env.REGISTRY_URL}/${env.REPO_PATH}:${env.TAG_NAME}
+              docker push ${env.REGISTRY_URL}/${env.REPO_PATH}:latest
+            """
+          }
+        }
+      }
+    }
+
+    stage('Cleanup Local Images') {
+      when {
+        expression {
+          return !(env.BRANCH_NAME?.startsWith("PR") ||
+                   (env.BRANCH_NAME ==~ /^(main)$/ && env.TRIGGER_TYPE != 'MANUAL'))
+        }
+      }
+      steps {
+        script {
+          sh """
+            docker image rm ${env.REGISTRY_URL}/${env.REPO_PATH}:${BUILD_NUMBER} || true
+            docker image rm ${env.REGISTRY_URL}/${env.REPO_PATH}:${env.TAG_NAME} || true
+            docker image rm ${env.REGISTRY_URL}/${env.REPO_PATH}:latest || true
+          """
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "Successfully built, analyzed, and pushed docker image for ${env.VM}"
+    }
+    failure {
+      echo "Build failed for ${env.BRANCH_NAME} (${env.VM})"
+    }
+    cleanup {
+        cleanWs()
+    }
+  }
+}
