@@ -8,7 +8,7 @@ pipeline {
     environment {
         APP_NAME       = 'url_shortener'
         IMAGE_TAG      = "${APP_NAME}:${env.BUILD_NUMBER}"
-        NEXUS_REGISTRY = 'nexus:8082'        // Docker hosted repo port (8081 is the Nexus UI/API port, not the registry)
+        NEXUS_REGISTRY = 'localhost:8082'   // host daemon (via mounted socket) can't resolve container-name DNS; Nexus port is published to host
         NEXUS_CREDS_ID = 'nexus-creds'      // Jenkins credential ID, populated from Vault
         VAULT_ADDR     = 'http://hashicorp-vault:8200'
         VAULT_CREDS_ID = 'vault-token'      // Jenkins credential ID for Vault token
