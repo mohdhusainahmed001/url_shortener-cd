@@ -24,6 +24,7 @@ pipeline {
 
         stage('Build') {
             steps {
+                sh 'rm -rf _build'
                 sh 'rebar3 compile'
                 sh 'rebar3 release'
             }
