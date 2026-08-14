@@ -25,6 +25,7 @@ pipeline {
         stage('Build') {
             steps {
                 sh 'rebar3 compile'
+                sh 'rebar3 release'
             }
         }
 
