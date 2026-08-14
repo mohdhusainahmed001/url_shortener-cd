@@ -65,7 +65,7 @@ pipeline {
         stage('Deploy via Ansible') {
             steps {
                 withVault(configuration: [vaultUrl: "${VAULT_ADDR}", vaultCredentialId: "${VAULT_CREDS_ID}"],
-                          vaultSecrets: [[path: "secret/${params.ENVIRONMENT}/deploy",
+                          vaultSecrets: [[path: "secret/data/${params.ENVIRONMENT}/deploy",
                                           secretValues: [[envVar: 'ANSIBLE_SSH_PASS', vaultKey: 'ssh_pass']]]]) {
                     sh """
                         ansible-playbook -i ansible/inventory/${params.ENVIRONMENT}.ini \
