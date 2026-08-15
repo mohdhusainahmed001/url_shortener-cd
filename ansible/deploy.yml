@@ -38,7 +38,7 @@
           ROCKSDB_BACKUP1: "localhost"
           REDIS_HOST: "redis"
           REDIS_PORT: "6379"
-          REDIS_PASS: ""
+          REDIS_PASS: "mysecretpass"
           DOCKER_IP: "localhost"
           DOCKER_PORT: "8000"
           ODP_IP: "localhost"
