@@ -25,7 +25,7 @@
         networks:
           - name: devops-net
         ports:
-          - "8000:8000"
+          - "8000:12000"
         env:
           ENVIRONMENT: "{{ env }}"
           KAFKA1: "localhost"
